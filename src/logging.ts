@@ -15,6 +15,7 @@ limitations under the License.
 */
 
 import { configure, getLogger } from 'log4js';
+import { Log } from 'oidc-client-ts';
 
 configure({
     appenders: {
@@ -28,6 +29,10 @@ configure({
             appenders: ['console'],
             level: 'debug',
         },
+        OIDC: {
+            appenders: ['console'],
+            level: 'info',
+        },
         Storage: {
             appenders: ['console'],
             level: 'info',
@@ -40,3 +45,6 @@ configure({
 });
 
 getLogger('logging').info('log4js configured');
+
+Log.setLogger(getLogger('OIDC'));
+Log.setLevel(Log.DEBUG);
