@@ -15,7 +15,7 @@ limitations under the License.
 -->
 
 <svelte:head>
-    <title>Login</title>
+    <title>Sign in</title>
 </svelte:head>
 
 <script lang="ts">
@@ -26,25 +26,96 @@ limitations under the License.
     import Button, { Label } from "@smui/button";
     import { Title } from "@smui/paper";
     import CircularProgress from '@smui/circular-progress';
+    import { getLoginFlows, getWellKnown } from '../../auth';
+    import { onDestroy, onMount } from 'svelte';
+    import { getLogger } from 'log4js';
 
     export let clientManager: ClientManager;
+
+    const log = getLogger('Login');
 
     let errorMessage = '';
     let loading = false;
 
-    async function login() {
+    let passwordSupported = false;
+    let oidcSupported = false;
+
+    let homeserverInput = clientManager.homeserverUrl;
+    
+    let loadedServerInfo = '';
+
+    $: params = new URLSearchParams(document.location.search);
+
+    $: (async () => {
+        if (params.has('code') || params.has('state') || params.has('error')) {
+            // OIDC in progress?
+        } else if (loadedServerInfo !== clientManager.homeserverUrl) {
+            try {
+                errorMessage = '';
+                passwordSupported = false;
+                oidcSupported = false;
+                clientManager.oidcIssuer = '';
+                const wellKnown = await getWellKnown(clientManager.homeserverUrl);
+                if (wellKnown['m.homeserver']?.base_url && wellKnown['m.homeserver'].base_url !== clientManager.homeserverUrl) {
+                    clientManager.homeserverUrl = wellKnown['m.homeserver'].base_url;
+                }
+                passwordSupported = (await getLoginFlows(clientManager.homeserverUrl)).flows.some(x => x.type === 'm.login.password');
+                clientManager.oidcIssuer = wellKnown['m.authentication']?.issuer ?? '';
+                oidcSupported = !!clientManager.oidcIssuer;
+            } catch (e: any) {
+                errorMessage = e?.message ?? 'An error occured';
+            }
+            loadedServerInfo = clientManager.homeserverUrl;
+        }
+    })();
+
+    async function loginWithPassword() {
+        log.info('loginWithPassword()');
         try {
             errorMessage = '';
             loading = true;
-            await clientManager.login();
+            await clientManager.loginWithPassword();
             router.replace('/');
         } catch (e: any) {
-            console.error(e);
+            log.error(e);
             errorMessage = [e.errcode, e.cause?.message ?? e.message].filter(x => !!x).join(': ');
         } finally {
             loading = false;
         }
     }
+
+    async function loginWithOidc() {
+        log.info('loginWithOidc()');
+        await clientManager.loginWithOidc();
+    }
+
+	function debounce<T>(action: (args: T) => void, duration: number): (args: T) => void {
+        let timer: NodeJS.Timeout;
+        return (args: T) => {
+            if (timer) {
+                clearTimeout(timer);
+            }
+            timer = setTimeout(() => {
+                action(args);
+            }, duration);
+        };
+	}
+
+    const debouncedHomeserver = debounce(() => clientManager.homeserverUrl = homeserverInput, 250);
+
+    onMount(async () => {
+        log.debug('onMount()');
+		if (params.has('error')) {
+            log.warn(`Received OIDC error: ${params.get('error_description')}`)
+            errorMessage = params.get('error_description') ?? 'An error occurred';
+        } else if (params.has('code')) {
+            await clientManager.completeOidcLogin();
+        } else if (params.has('state')) {
+
+        }
+    });
+
+    onDestroy(() => log.debug('onDestroy()'));
 </script>
 
 <div>
@@ -59,22 +130,32 @@ limitations under the License.
         </p>
     {/if}
 
-    <form on:submit|preventDefault={() => login()}>
-        <Textfield variant="outlined" label="Homeserver" type="text" bind:value={clientManager.homeserverUrl} required style="margin-top: 16px;">
+    <form on:submit|preventDefault={() => {}}>
+        <Textfield variant="outlined" label="Homeserver" type="text" bind:value={homeserverInput} on:keyup={debouncedHomeserver} required style="margin-top: 16px;">
             <HelperText slot="helper">e.g. https://matrix.org</HelperText>
         </Textfield>
-        <Textfield variant="outlined" label="Username" type="text" bind:value={clientManager.userId} required style="margin-top: 16px;">
-            <HelperText slot="helper">Your matrix username</HelperText>
-        </Textfield>
-        <Textfield variant="outlined" label="Password" type="password" bind:value={clientManager.password} required style="margin-top: 16px;">
-            <HelperText slot="helper">Your matrix password</HelperText>
-        </Textfield>
-        <Button type="submit" variant="unelevated" disabled={loading}>
-            Sign in
-            {#if loading}
-                <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
-            {/if}
-        </Button>
+        {#if passwordSupported}
+            <Textfield variant="outlined" label="Username" type="text" bind:value={clientManager.userId} required style="margin-top: 16px;">
+                <HelperText slot="helper">Your matrix username</HelperText>
+            </Textfield>
+            <Textfield variant="outlined" label="Password" type="password" bind:value={clientManager.password} required style="margin-top: 16px;">
+                <HelperText slot="helper">Your matrix password</HelperText>
+            </Textfield>
+            <Button type="submit" variant="unelevated" disabled={loading} on:click={() => loginWithPassword()}>
+                Sign in
+                {#if loading}
+                    <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                {/if}
+            </Button>
+        {/if}
+        {#if oidcSupported}
+            <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc()}>
+                Sign in using OIDC
+                {#if loading}
+                    <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                {/if}                  
+            </Button>
+        {/if}
         <p>
             New?
             <Button on:click:preventDefault={() => router.show('/register')} href="#">

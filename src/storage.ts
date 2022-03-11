@@ -14,8 +14,18 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
+import { getLogger } from "log4js";
+
+const log = getLogger('Storage');
+
+function genFullKey(short: string): string {
+    return `mx_f_${short}`;
+}
+
 export function storeValue(key: string, value: any) {
-    localStorage.setItem("mx_f_" + key, JSON.stringify(value));
+    const fullKey = genFullKey(key);
+    log.debug(`localStorage.setItem(${fullKey}) = ${value}`);
+    localStorage.setItem(fullKey, JSON.stringify(value));
 }
 
 export function readValueNoDefault<T>(key: string): T | undefined {
@@ -23,7 +33,14 @@ export function readValueNoDefault<T>(key: string): T | undefined {
 }
 
 export function readValue<T>(key: string, def: T): T {
-    const val = localStorage.getItem("mx_f_" + key);
+    const fullKey = genFullKey(key);
+    const val = localStorage.getItem(fullKey);
+    log.debug(`localStorage.getItem(${fullKey}) = ${val}`);
     if (val === null || val === undefined) return def;
-    return JSON.parse(val);
+    try {
+        return JSON.parse(val);
+    } catch (e) {
+        storeValue(fullKey, def);
+        return def;
+    }
 }

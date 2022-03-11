@@ -24,6 +24,24 @@ import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localSto
 import { WebStorageSessionStore } from 'matrix-js-sdk/lib/store/session/webstorage';
 import { MatrixFiles } from 'matrix-files-sdk';
 
+export async function getWellKnown(baseUrl: string): Promise<{ 'm.authentication'? :{ issuer?: string }, 'm.homeserver'?: { base_url?: string } }> {
+    const url = new URL(baseUrl);
+    url.search = '';
+    url.pathname = '/.well-known/matrix/client';
+    const response = await fetch(url.href);
+    return response.json();
+} 
+
+export async function getLoginFlows(baseUrl: string) {
+    const tempClient = createClientImpl({ baseUrl });
+
+    return tempClient.loginFlows() as Promise<{
+        flows: [
+            { type: string }
+        ],
+    }>;
+}
+
 export async function loginWithPassword(
     localStorage: Storage,
     homeserver: string,

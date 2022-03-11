@@ -26,6 +26,10 @@ configure({
     categories: {
         default: {
             appenders: ['console'],
+            level: 'debug',
+        },
+        Storage: {
+            appenders: ['console'],
             level: 'info',
         },
         MatrixFilesSDK: {

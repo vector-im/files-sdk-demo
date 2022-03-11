@@ -33,12 +33,15 @@ limitations under the License.
     import { errorWrapper, setMenuPositions, sortEntries, workspaceNameValidator } from "../utils";
     import { ToastContainer, FlatToast }  from "svelte-toasts";
     import Textfield from "@smui/textfield";
-    import type { IFolderEntry } from "matrix-files-sdk";
+    import type { IFolderEntry, TreeSpaceEntry } from "matrix-files-sdk";
     import Register from "./auth/Register.svelte";
     import IconButton from "@smui/icon-button";
     import dayjs from "dayjs";
     import 'dayjs/locale/en';
     import localizedFormat from 'dayjs/plugin/localizedFormat';
+    import { getLogger } from "log4js";
+
+    const log = getLogger('App');
 
     dayjs.extend(localizedFormat);
     dayjs.locale('en');
@@ -83,10 +86,6 @@ limitations under the License.
         }
     }
 
-    router('/', async () => {
-        await redirectIfAuthed(() => router.redirect('/signin'));
-    });
-
     type ThenRoute = (ctx: PageJS.Context) => string;
     function requiresAuth(then: string | ThenRoute, and?: PageJS.Callback): PageJS.Callback {
         return (realCtx: PageJS.Context, realNext: () => void) => {
@@ -123,9 +122,19 @@ limitations under the License.
     let workspaces: IFolderEntry[] = [];
 
     async function loadWorkspaces() {
+        log.info('loadWorkspaces()');
         workspaces = sortEntries(await clientManager.files.getChildren()) as IFolderEntry[];
+        workspaces.forEach(x => log.info((x as TreeSpaceEntry).treespace.room.getMyMembership()));
     }
 
+    router ('*', ({ path, querystring, hash }, next) => {
+        log.info(`GET ${path}${hash ? `#${hash}` : ''}${querystring ? `?${querystring}`: ''}`);
+        next();
+    });
+
+    router('/', async () => {
+        await redirectIfAuthed(() => router.redirect('/signin'));
+    });
     router('/signin', async (_ctx, next) => {
         await redirectIfAuthed(() => next());
     }, () => page = Login);
