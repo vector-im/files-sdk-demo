@@ -103,6 +103,29 @@ export class ClientManager {
         return this._crypto;
     }
 
+    private userManager: UserManager | undefined;
+
+    private getOidcUserManager() {
+        if (this.userManager && this.userManager.settings.authority !== this.oidcIssuer) {
+            log.info('Recreating OIDC UserManager as issuer changed');
+            this.userManager.stopSilentRenew();
+            this.userManager = undefined;
+        }
+
+        if (!this.userManager) {
+            this.userManager = new UserManager({ authority: this.oidcIssuer, client_id, redirect_uri: this.getRedirectUri(), accessTokenExpiringNotificationTimeInSeconds: 30 });
+            this.userManager.events.addUserLoaded(({ access_token, expires_in }) => {
+                log.debug(`Access token renewed with new expiry in ${expires_in}s`);
+                this.accessToken = access_token;
+                if (this._files) {
+                    this._files.client.http.opts.accessToken = access_token;
+                }
+            });
+        }
+
+        return this.userManager;
+    }
+
     public get hasAuthData(): boolean {
         log.debug(`hasAuthData() homeserverUrl=${!!this.homeserverUrl} accessToken=${!!this.accessToken} deviceId=${!!this.deviceId} userId=${!!this.userId}`);
         return !!this.homeserverUrl && !!this.accessToken && !!this.deviceId && !!this.userId;
@@ -114,7 +137,7 @@ export class ClientManager {
         } catch (e: any) {
             console.error(e.errcode);
             if (e instanceof MatrixError && e.errcode === 'M_FORBIDDEN') {
-                toasts.warning('You have been logged out', { duration: 5000 });
+                toasts.warning('You have been signed out', { duration: 5000 });
                 await this._logout(this.homeserverUrl);
                 router.redirect('/signin');
             } else {
@@ -140,8 +163,7 @@ export class ClientManager {
 
     public async loginWithOidc() {
         log.info('loginWithOidc()');
-        const userManager = new UserManager({ authority: this.oidcIssuer, client_id, redirect_uri: this.getRedirectUri() });
-        await userManager.signinRedirect();
+        await this.getOidcUserManager().signinRedirect();
     }
 
     public async completeOidcLogin() {
@@ -151,8 +173,7 @@ export class ClientManager {
         if (!authority) {
             log.warn('Received OIDC code but no issuer available');
         } else {
-            const userManager = new UserManager({ authority, client_id, redirect_uri: this.getRedirectUri() });
-            const signinResponse = await userManager.signinCallback();
+            const signinResponse = await this.getOidcUserManager().signinCallback();
             if (signinResponse) {
                 const { access_token } = signinResponse;
 
