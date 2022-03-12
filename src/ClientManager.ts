@@ -148,6 +148,10 @@ export class ClientManager {
     }
 
     public async rehydrate() {
+        if (this.oidcIssuer) {
+            // initialise UserManager for refreshing tokens
+            this.getOidcUserManager();
+        }
         await this.wrapForbidden(async () => {
             this._files = await createFromToken(localStorage, this.homeserverUrl, this.accessToken, this.userId, this.deviceId);
             await this.bootstrap();
