@@ -113,7 +113,7 @@ export class ClientManager {
         }
 
         if (!this.userManager) {
-            this.userManager = new UserManager({ authority: this.oidcIssuer, client_id, redirect_uri: this.getRedirectUri(), accessTokenExpiringNotificationTimeInSeconds: 30 });
+            this.userManager = new UserManager({ authority: this.oidcIssuer, client_id, redirect_uri: this.getRedirectUri(), accessTokenExpiringNotificationTimeInSeconds: 30, prompt: 'login' });
             this.userManager.events.addUserLoaded(({ access_token, expires_in }) => {
                 log.debug(`Access token renewed with new expiry in ${expires_in}s`);
                 this.accessToken = access_token;
