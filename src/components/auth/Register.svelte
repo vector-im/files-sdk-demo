@@ -26,13 +26,52 @@ limitations under the License.
     import Button, { Label } from "@smui/button";
     import { Title } from "@smui/paper";
     import CircularProgress from '@smui/circular-progress';
+    import { getLogger } from 'log4js';
+    import { onMount } from 'svelte';
+    import { getLoginFlows, getWellKnown } from '../../auth';
+    import { debounce } from '../../utils';
 
     export let clientManager: ClientManager;
+
+    const log = getLogger('Register');
 
     let errorMessage = '';
     let loading = false;
 
-    async function register() {
+    let passwordSupported = false;
+    let oidcSupported = false;
+
+    let homeserverInput = clientManager.homeserverUrl;
+    
+    let loadedServerInfo = '';
+
+    $: params = new URLSearchParams(document.location.search);
+
+    $: (async () => {
+        if (params.has('code')) {
+            // OIDC in progress?
+        } else if (loadedServerInfo !== clientManager.homeserverUrl) {
+            try {
+                errorMessage = '';
+                passwordSupported = false;
+                oidcSupported = false;
+                clientManager.oidcIssuer = '';
+                const wellKnown = await getWellKnown(clientManager.homeserverUrl);
+                if (wellKnown['m.homeserver']?.base_url && wellKnown['m.homeserver'].base_url !== clientManager.homeserverUrl) {
+                    clientManager.homeserverUrl = wellKnown['m.homeserver'].base_url;
+                }
+                passwordSupported = (await getLoginFlows(clientManager.homeserverUrl)).flows.some(x => x.type === 'm.login.password');
+                clientManager.oidcIssuer = wellKnown['m.authentication']?.issuer ?? '';
+                oidcSupported = !!clientManager.oidcIssuer;
+            } catch (e: any) {
+                errorMessage = e?.message ?? 'An error occured';
+            }
+            loadedServerInfo = clientManager.homeserverUrl;
+        }
+    })();
+
+    async function registerWithPassword() {
+        log.info('registerWithPassword()');
         try {
             errorMessage = '';
             loading = true;
@@ -45,6 +84,25 @@ limitations under the License.
             loading = false;
         }
     }
+
+    async function registerWithOidc() {
+        log.info('registerWithOidc()');
+        await clientManager.registerWithOidc();
+    }
+
+    const debouncedHomeserver = debounce(() => clientManager.homeserverUrl = homeserverInput, 250);
+
+    onMount(async () => {
+        log.debug('onMount()');
+		if (params.has('error')) {
+            log.warn(`Received OIDC error: ${params.get('error_description') ?? params.get('error')}`)
+            errorMessage =(params.get('error_description') ?? params.get('error')) ?? 'An error occurred';
+        } else if (params.has('code')) {
+            await clientManager.completeOidcLogin();
+        } else if (params.has('state')) {
+
+        }
+    });
 </script>
 
 <div>
@@ -59,22 +117,33 @@ limitations under the License.
         </p>
     {/if}
 
-    <form on:submit|preventDefault={() => register()}>
-        <Textfield variant="outlined" label="Homeserver" type="text" bind:value={clientManager.homeserverUrl} required style="margin-top: 16px;">
+    <form on:submit|preventDefault={() => {}}>
+        <Textfield variant="outlined" label="Homeserver" type="text" bind:value={homeserverInput} on:keyup={debouncedHomeserver} required style="margin-top: 16px;">
             <HelperText slot="helper">e.g. https://matrix.org</HelperText>
         </Textfield>
-        <Textfield variant="outlined" label="Username" type="text" bind:value={clientManager.userId} required style="margin-top: 16px;">
-            <HelperText slot="helper"></HelperText>
-        </Textfield>
-        <Textfield variant="outlined" label="Password" type="password" bind:value={clientManager.password} required style="margin-top: 16px;">
-            <HelperText slot="helper"></HelperText>
-        </Textfield>
-        <Button type="submit" variant="unelevated" disabled={loading}>
-            Register
-            {#if loading}
-                <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
-            {/if}
-        </Button>
+        {#if passwordSupported}
+            <Textfield variant="outlined" label="Username" type="text" bind:value={clientManager.userId} required style="margin-top: 16px;">
+                <HelperText slot="helper"></HelperText>
+            </Textfield>
+            <Textfield variant="outlined" label="Password" type="password" bind:value={clientManager.password} required style="margin-top: 16px;">
+                <HelperText slot="helper"></HelperText>
+            </Textfield>
+            <Button type="submit" variant="unelevated" disabled={loading} on:click={() => registerWithPassword()}>
+                Register
+                {#if loading}
+                    <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                {/if}
+            </Button>
+        {/if}
+        {#if oidcSupported}
+            <Button variant="unelevated" disabled={loading} on:click={() => registerWithOidc()}>
+                Register via OIDC
+                {#if loading}
+                    <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                {/if}                  
+            </Button>
+        {/if}
+
         <p>
             Already have an account?
             <Button on:click:preventDefault={() => router.show('/signin')} href="#">

@@ -23,7 +23,7 @@ import { MatrixError } from "matrix-js-sdk";
 import { toasts } from "svelte-toasts";
 import router from 'page';
 import { getLogger } from "log4js";
-import { UserManager } from 'oidc-client-ts';
+import { ExtraSigninRequestArgs, UserManager } from 'oidc-client-ts';
 
 const log = getLogger('ClientManager');
 
@@ -113,7 +113,7 @@ export class ClientManager {
         }
 
         if (!this.userManager) {
-            this.userManager = new UserManager({ authority: this.oidcIssuer, client_id, redirect_uri: this.getRedirectUri(), accessTokenExpiringNotificationTimeInSeconds: 30, prompt: 'login' });
+            this.userManager = new UserManager({ authority: this.oidcIssuer, client_id, redirect_uri: this.getRedirectUri(), accessTokenExpiringNotificationTimeInSeconds: 30 });
             this.userManager.events.addUserLoaded(({ access_token, expires_in }) => {
                 log.debug(`Access token renewed with new expiry in ${expires_in}s`);
                 this.accessToken = access_token;
@@ -167,7 +167,12 @@ export class ClientManager {
 
     public async loginWithOidc() {
         log.info('loginWithOidc()');
-        await this.getOidcUserManager().signinRedirect();
+        await this.getOidcUserManager().signinRedirect({ prompt: 'login' } as any as ExtraSigninRequestArgs);
+    }
+
+    public async registerWithOidc() {
+        log.info('registerWithOidc()');
+        await this.getOidcUserManager().signinRedirect({ prompt: 'create' } as any as ExtraSigninRequestArgs);
     }
 
     public async completeOidcLogin() {

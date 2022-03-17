@@ -29,6 +29,7 @@ limitations under the License.
     import { getLoginFlows, getWellKnown } from '../../auth';
     import { onDestroy, onMount } from 'svelte';
     import { getLogger } from 'log4js';
+    import { debounce } from '../../utils';
 
     export let clientManager: ClientManager;
 
@@ -47,7 +48,7 @@ limitations under the License.
     $: params = new URLSearchParams(document.location.search);
 
     $: (async () => {
-        if (params.has('code') || params.has('state') || params.has('error')) {
+        if (params.has('code')) {
             // OIDC in progress?
         } else if (loadedServerInfo !== clientManager.homeserverUrl) {
             try {
@@ -88,26 +89,14 @@ limitations under the License.
         log.info('loginWithOidc()');
         await clientManager.loginWithOidc();
     }
-
-	function debounce<T>(action: (args: T) => void, duration: number): (args: T) => void {
-        let timer: NodeJS.Timeout;
-        return (args: T) => {
-            if (timer) {
-                clearTimeout(timer);
-            }
-            timer = setTimeout(() => {
-                action(args);
-            }, duration);
-        };
-	}
-
+    
     const debouncedHomeserver = debounce(() => clientManager.homeserverUrl = homeserverInput, 250);
 
     onMount(async () => {
         log.debug('onMount()');
 		if (params.has('error')) {
-            log.warn(`Received OIDC error: ${params.get('error_description')}`)
-            errorMessage = params.get('error_description') ?? 'An error occurred';
+            log.warn(`Received OIDC error: ${params.get('error_description') ?? params.get('error')}`)
+            errorMessage =(params.get('error_description') ?? params.get('error')) ?? 'An error occurred';
         } else if (params.has('code')) {
             await clientManager.completeOidcLogin();
         } else if (params.has('state')) {
@@ -150,7 +139,7 @@ limitations under the License.
         {/if}
         {#if oidcSupported}
             <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc()}>
-                Sign in using OIDC
+                Sign in via OIDC
                 {#if loading}
                     <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
                 {/if}                  

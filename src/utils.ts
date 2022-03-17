@@ -94,3 +94,15 @@ export function setMenuPositions(e: PointerEvent) {
     setTimeout(() => _setMenuPositions(e), 10);
     setTimeout(() => _setMenuPositions(e), 100);
 }
+
+export function debounce<T>(action: (args: T) => void, duration: number): (args: T) => void {
+    let timer: NodeJS.Timeout;
+    return (args: T) => {
+        if (timer) {
+            clearTimeout(timer);
+        }
+        timer = setTimeout(() => {
+            action(args);
+        }, duration);
+    };
+}
