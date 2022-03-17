@@ -1,15 +1,18 @@
-FROM node:14
+FROM node:14-alpine as builder
 
 ARG DEFAULT_HOMESERVER
 
-RUN git clone -b oidc --single-branch https://github.com/vector-im/files-sdk-demo
-
 WORKDIR /files-sdk-demo
+
+COPY .npmrc yarn.lock package.json oidc-client-ts-2.0.1-with-PR417.tgz ./
 RUN yarn install --frozen-lockfile
 
+COPY src ./src
+COPY public ./public
+COPY tsconfig.json webpack.config.js webpack.parts.js ./
 ENV DEFAULT_HOMESERVER ${DEFAULT_HOMESERVER}
 RUN yarn build
 
-EXPOSE 5001
+FROM nginxinc/nginx-unprivileged:1.21-alpine
 
-ENTRYPOINT ["npx", "http-server", "-p5001", "dist"]
+COPY --from=builder /files-sdk-demo/dist /usr/share/nginx/html
