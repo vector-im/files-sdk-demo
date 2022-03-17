@@ -23,7 +23,8 @@ import { MatrixError } from "matrix-js-sdk";
 import { toasts } from "svelte-toasts";
 import router from 'page';
 import { getLogger } from "log4js";
-import { ExtraSigninRequestArgs, UserManager } from 'oidc-client-ts';
+import type { ExtraSigninRequestArgs } from 'oidc-client-ts';
+import { UserManager } from 'oidc-client-ts';
 
 const log = getLogger('ClientManager');
 
