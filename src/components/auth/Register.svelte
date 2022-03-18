@@ -132,7 +132,7 @@ limitations under the License.
                     Homeserver { clientManager.homeserverUrl } supports auth via OIDC:
                 </p>
                 <Button variant="unelevated" disabled={loading} on:click={() => registerWithOidc()}>
-                    Register via OIDC
+                    Next
                     {#if loading}
                         <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
                     {/if}                  
