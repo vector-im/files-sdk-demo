@@ -129,7 +129,7 @@ limitations under the License.
                 <HelperText slot="helper"></HelperText>
             </Textfield>
             <Button type="submit" variant="unelevated" disabled={loading} on:click={() => registerWithPassword()}>
-                Register
+                Register with HS Password
                 {#if loading}
                     <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
                 {/if}

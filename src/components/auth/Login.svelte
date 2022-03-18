@@ -131,7 +131,7 @@ limitations under the License.
                 <HelperText slot="helper">Your matrix password</HelperText>
             </Textfield>
             <Button type="submit" variant="unelevated" disabled={loading} on:click={() => loginWithPassword()}>
-                Sign in
+                Sign in with HS Password
                 {#if loading}
                     <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
                 {/if}
