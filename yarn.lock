@@ -738,7 +738,7 @@
     "@smui/ripple" "^5.0.1"
     svelte2tsx "^0.4.6"
 
-"@smui/card@5.0.1":
+"@smui/card@5.0.1", "@smui/card@^5.0.1":
   version "5.0.1"
   resolved "https://registry.yarnpkg.com/@smui/card/-/card-5.0.1.tgz#155f3b87e71c3b964b35aeefc7d244c7f49e854e"
   integrity sha512-tENcCPoCgyXBe76vipQUPblggK9ZJDodLSPhMDHBWXSa1k6fbE9cfRDzik8pSybrvWI8wZcV781WRgUtTgUICA==

@@ -29,6 +29,7 @@ limitations under the License.
     import { getLoginFlows, getWellKnown } from '../../auth';
     import { onDestroy, onMount } from 'svelte';
     import { getLogger } from 'log4js';
+    import Card from "@smui/card";
     import { debounce } from '../../utils';
 
     export let clientManager: ClientManager;
@@ -56,13 +57,18 @@ limitations under the License.
                 passwordSupported = false;
                 oidcSupported = false;
                 clientManager.oidcIssuer = '';
-                const wellKnown = await getWellKnown(clientManager.homeserverUrl);
-                if (wellKnown['m.homeserver']?.base_url && wellKnown['m.homeserver'].base_url !== clientManager.homeserverUrl) {
-                    clientManager.homeserverUrl = wellKnown['m.homeserver'].base_url;
+                try {
+                    const wellKnown = await getWellKnown(clientManager.homeserverUrl);
+                    if (wellKnown['m.homeserver']?.base_url && wellKnown['m.homeserver'].base_url !== clientManager.homeserverUrl) {
+                        clientManager.homeserverUrl = wellKnown['m.homeserver'].base_url;
+                    }
+                    clientManager.oidcIssuer = wellKnown['m.authentication']?.issuer ?? '';
+                    oidcSupported = !!clientManager.oidcIssuer;
+                } catch (e: any) {
+                    // OIDC is not supported as no .well-known
+                    log.warn(e);
                 }
                 passwordSupported = (await getLoginFlows(clientManager.homeserverUrl)).flows.some(x => x.type === 'm.login.password');
-                clientManager.oidcIssuer = wellKnown['m.authentication']?.issuer ?? '';
-                oidcSupported = !!clientManager.oidcIssuer;
             } catch (e: any) {
                 errorMessage = e?.message ?? 'An error occured';
             }
@@ -113,44 +119,54 @@ limitations under the License.
         <strong>Please use a dedicated test account. The homeserver also needs to allow high request rates.</strong>
     </p>
 
-    {#if errorMessage}
-        <p style="color: red; text-align: center; font-weight: bold;">
-            {errorMessage}
-        </p>
-    {/if}
-
     <form on:submit|preventDefault={() => {}}>
-        <Textfield variant="outlined" label="Homeserver" type="text" bind:value={homeserverInput} on:keyup={debouncedHomeserver} required style="margin-top: 16px;">
-            <HelperText slot="helper">e.g. https://matrix.org</HelperText>
-        </Textfield>
-        {#if passwordSupported}
-            <Textfield variant="outlined" label="Username" type="text" bind:value={clientManager.userId} required style="margin-top: 16px;">
-                <HelperText slot="helper">Your matrix username</HelperText>
+        <Card padded style="max-width: 500px">
+            <Textfield variant="outlined" label="Homeserver" type="text" bind:value={homeserverInput} on:keyup={debouncedHomeserver} required style="margin-top: 16px;">
+                <HelperText slot="helper">e.g. https://matrix.org</HelperText>
             </Textfield>
-            <Textfield variant="outlined" label="Password" type="password" bind:value={clientManager.password} required style="margin-top: 16px;">
-                <HelperText slot="helper">Your matrix password</HelperText>
-            </Textfield>
-            <Button type="submit" variant="unelevated" disabled={loading} on:click={() => loginWithPassword()}>
-                Sign in with HS Password
-                {#if loading}
-                    <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
-                {/if}
-            </Button>
-        {/if}
-        {#if oidcSupported}
-            <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc()}>
-                Sign in via OIDC
-                {#if loading}
-                    <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
-                {/if}                  
-            </Button>
-        {/if}
-        <p>
-            New?
-            <Button on:click:preventDefault={() => router.show('/register')} href="#">
-                <Label>Create account</Label>
-            </Button>
-        </p>
+            {#if errorMessage}
+                <p style="color: red; text-align: center; font-weight: bold;">
+                    {errorMessage}
+                </p>
+            {/if}
+            {#if oidcSupported}
+                <p>
+                    Homeserver { clientManager.homeserverUrl } supports auth via OIDC:
+                </p>
+                <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc()}>
+                    Next
+                    {#if loading}
+                        <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                    {/if}                  
+                </Button>
+            {/if}
+            {#if oidcSupported && passwordSupported}
+                <p>or:</p>
+            {/if}
+            {#if passwordSupported}
+                <p>
+                    Homeserver { clientManager.homeserverUrl } supports auth via Matrix password:
+                </p>
+                <Textfield variant="outlined" label="Username" type="text" bind:value={clientManager.userId} required style="margin-top: 16px;">
+                    <HelperText slot="helper">Your matrix username</HelperText>
+                </Textfield>
+                <Textfield variant="outlined" label="Password" type="password" bind:value={clientManager.password} required style="margin-top: 16px;">
+                    <HelperText slot="helper">Your matrix password</HelperText>
+                </Textfield>
+                <Button type="submit" variant="unelevated" disabled={loading} on:click={() => loginWithPassword()}>
+                    Sign in with HS password
+                    {#if loading}
+                        <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                    {/if}
+                </Button>        
+            {/if}
+            <p>
+                Not got an account?
+                <Button on:click:preventDefault={() => router.show('/register')} href="#">
+                    <Label>Register</Label>
+                </Button>
+            </p>
+        </Card>
         <p>
             <i>It is recommended to use a dedicated test account as the E2E encryption settings used in this beta version may clash with your existing account and your keys get lost.</i>
         </p>

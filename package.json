@@ -48,6 +48,7 @@
     "@material/typography": "^13.0.0",
     "@matrix-org/olm": "https://gitlab.matrix.org/api/v4/projects/27/packages/npm/@matrix-org/olm/-/@matrix-org/olm-3.2.8.tgz",
     "@smui/button": "^5.0.1",
+    "@smui/card": "^5.0.1",
     "@smui/data-table": "^5.0.1",
     "@smui/fab": "^5.0.1",
     "@smui/icon-button": "^5.0.1",
