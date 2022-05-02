@@ -27,6 +27,7 @@ limitations under the License.
     import type { DeviceTrustLevel } from "matrix-js-sdk/lib/crypto/CrossSigning";
     import { Icon } from "@smui/button";
     import type { IKeyBackupInfo } from 'matrix-js-sdk/lib/crypto/keybackup';
+    import { getWellKnown } from '../auth';
 
     export let clientManager: ClientManager;
     
@@ -40,6 +41,7 @@ limitations under the License.
     let keyBackupInfo: IKeyBackupInfo | undefined;
     let devices: IMyDevice[] = [];
     let deviceTrust: Record<string, DeviceTrustLevel> = {};
+    let manageAccountLink: string | undefined;
 
     async function update() {
         isCrossSigningReady = await client().isCrossSigningReady();
@@ -51,7 +53,8 @@ limitations under the License.
             map[d.device_id] = clientManager.client.checkDeviceTrust(clientManager.client.getUserId(), d.device_id);
             return map;
         }, {} as Record<string, DeviceTrustLevel>);
-        
+
+        manageAccountLink = (await getWellKnown(client().baseUrl))['m.authentication']?.account;        
     }
     onMount(update);
 </script>
@@ -63,6 +66,11 @@ limitations under the License.
 <p>MatrixClient.isCrossSigningReady: {isCrossSigningReady === undefined ? 'checking' : isCrossSigningReady}</p>
 <p>MatrixClient.isSecretStorageReady: {isSecretStorageReady === undefined ? 'checking' : isSecretStorageReady}</p>
 
+{#if manageAccountLink }
+    <p>
+        <a href="{manageAccountLink}" target="_blank">Manage account</a>
+    </p>
+{/if}
 <hr>
 <h3>Sessions</h3>
 <ul>
