@@ -4214,9 +4214,10 @@ object.assign@^4.1.2:
     has-symbols "^1.0.1"
     object-keys "^1.1.1"
 
-oidc-client-ts@./oidc-client-ts-2.0.1-with-PR417.tgz:
-  version "2.0.1"
-  resolved "./oidc-client-ts-2.0.1-with-PR417.tgz#0dce04109b9ec2bf7c7f3a47923e5d5305a17f81"
+oidc-client-ts@^2.0.2:
+  version "2.0.3"
+  resolved "https://registry.yarnpkg.com/oidc-client-ts/-/oidc-client-ts-2.0.3.tgz#dd808d0d5abe845ef67adafd9a5ade0ba00a213f"
+  integrity sha512-+sxbndH4iXfAbOqdnfUG9Q39wL4B6BCaHqSLHNAaBJPaqkxtEBTzOHWIoHS1hI6IjEb5ZtbWmCr9e3TDEkBlSQ==
   dependencies:
     crypto-js "^4.1.1"
     jwt-decode "^3.1.2"

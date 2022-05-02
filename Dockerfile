@@ -4,7 +4,7 @@ ARG DEFAULT_HOMESERVER
 
 WORKDIR /files-sdk-demo
 
-COPY .npmrc yarn.lock package.json oidc-client-ts-2.0.1-with-PR417.tgz ./
+COPY .npmrc yarn.lock package.json ./
 RUN yarn install --frozen-lockfile
 
 COPY src ./src

@@ -70,7 +70,7 @@
     "matrix-files-sdk": "^2.4.1",
     "matrix-js-sdk": "^15.6.0-rc.1",
     "mime-types": "^2.1.34",
-    "oidc-client-ts": "./oidc-client-ts-2.0.1-with-PR417.tgz",
+    "oidc-client-ts": "^2.0.2",
     "page": "^1.11.6",
     "svelte": "^3.46.2",
     "svelte-accordion": "^0.0.0-development",
