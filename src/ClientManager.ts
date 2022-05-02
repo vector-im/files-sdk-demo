@@ -23,14 +23,13 @@ import { MatrixError } from "matrix-js-sdk";
 import { toasts } from "svelte-toasts";
 import router from 'page';
 import { getLogger } from "log4js";
-import type { ExtraSigninRequestArgs } from 'oidc-client-ts';
-import { UserManager } from 'oidc-client-ts';
+import {
+    UserManager, MetadataService, OidcClientSettingsStore, type ExtraSigninRequestArgs,
+} from 'oidc-client-ts';
 
 const log = getLogger('ClientManager');
 
 const defaultHomeserver = process.env.DEFAULT_HOMESERVER!;
-
-const client_id = 'files-sdk-demo';
 
 export class ClientManager {
     private _files: MatrixFiles | undefined;
@@ -52,6 +51,22 @@ export class ClientManager {
 
     public set oidcIssuer(val) {
         storeValue("oidcIssuer", val);
+    }
+
+    public get oidcClientId(): string {
+        return readValue("oidcClientId", '');
+    }
+
+    public set oidcClientId(val) {
+        storeValue("oidcClientId", val);
+    }
+
+    public get oidcClientSecret(): string {
+        return readValue("oidcClientSecret", '');
+    }
+
+    public set oidcClientSecret(val) {
+        storeValue("oidcClientSecret", val);
     }
 
     public get accessToken(): string {
@@ -106,7 +121,7 @@ export class ClientManager {
 
     private userManager: UserManager | undefined;
 
-    private getOidcUserManager() {
+    private async getOidcUserManager() {
         if (this.userManager && this.userManager.settings.authority !== this.oidcIssuer) {
             log.info('Recreating OIDC UserManager as issuer changed');
             this.userManager.stopSilentRenew();
@@ -114,7 +129,59 @@ export class ClientManager {
         }
 
         if (!this.userManager) {
-            this.userManager = new UserManager({ authority: this.oidcIssuer, client_id, redirect_uri: this.getRedirectUri(), accessTokenExpiringNotificationTimeInSeconds: 30 });
+            const authority = this.oidcIssuer;
+            const client_uri = document.location.origin + document.location.pathname;
+            const redirect_uri = client_uri;
+
+            if (!this.oidcClientId) {
+                const { registration_endpoint } = await (new MetadataService(new OidcClientSettingsStore({
+                    authority,
+                    redirect_uri,
+                    client_id: 'notused',
+                }))).getMetadata();
+
+                if (!registration_endpoint) {
+                    throw new Error('Server does not support client registration');
+                }
+
+                const clientMetadata = {
+                    client_name: "Files SDK Demo",
+                    logo_uri: new URL("logo.svg", client_uri).href,
+                    client_uri,
+                    tos_uri: "https://element.io/terms-of-service",
+                    policy_uri: "https://element.io/privacy",
+                    response_types: ["code"],
+                    grant_types: ["authorization_code", "refresh_token"],
+                    redirect_uris: [redirect_uri],
+                    id_token_signed_response_alg: "RS256",
+                    token_endpoint_auth_method: "none",
+                };
+
+                const res = await fetch(registration_endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: "omit",
+                    cache: 'no-cache',
+                    body: JSON.stringify(clientMetadata),
+                });
+
+                const json = await res.json();
+
+                this.oidcClientId = json.client_id;
+                this.oidcClientSecret = json.client_secret;
+
+                log.info(`Registered with OIDC issuer as ${this.oidcClientId}`);
+            }
+
+            this.userManager = new UserManager({
+                authority,
+                client_id: this.oidcClientId,
+                client_secret: this.oidcClientSecret,
+                redirect_uri,
+                accessTokenExpiringNotificationTimeInSeconds: 30,
+            });
             this.userManager.events.addUserLoaded(({ access_token, expires_in }) => {
                 log.debug(`Access token renewed with new expiry in ${expires_in}s`);
                 this.accessToken = access_token;
@@ -159,21 +226,14 @@ export class ClientManager {
         });
     }
 
-    private getRedirectUri(): string {
-        const url = new URL(window.location.href);
-        url.hash = '';
-        url.search = '';
-        return url.href;
-    }
-
     public async loginWithOidc() {
         log.info('loginWithOidc()');
-        await this.getOidcUserManager().signinRedirect({ prompt: 'login' } as any as ExtraSigninRequestArgs);
+        await (await this.getOidcUserManager()).signinRedirect({ prompt: 'login' } as any as ExtraSigninRequestArgs);
     }
 
     public async registerWithOidc() {
         log.info('registerWithOidc()');
-        await this.getOidcUserManager().signinRedirect({ prompt: 'create' } as any as ExtraSigninRequestArgs);
+        await (await this.getOidcUserManager()).signinRedirect({ prompt: 'create' } as any as ExtraSigninRequestArgs);
     }
 
     public async completeOidcLogin() {
@@ -183,7 +243,7 @@ export class ClientManager {
         if (!authority) {
             log.warn('Received OIDC code but no issuer available');
         } else {
-            const signinResponse = await this.getOidcUserManager().signinCallback();
+            const signinResponse = await (await this.getOidcUserManager()).signinCallback();
             if (signinResponse) {
                 const { access_token } = signinResponse;
 
