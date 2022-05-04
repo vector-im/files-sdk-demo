@@ -53,6 +53,14 @@ export class ClientManager {
         storeValue("oidcIssuer", val);
     }
 
+    public get oidcClientIssuer(): string {
+        return readValue("oidcClientIssuer", '');
+    }
+
+    public set oidcClientIssuer(val) {
+        storeValue("oidcClientIssuer", val);
+    }
+
     public get oidcClientId(): string {
         return readValue("oidcClientId", '');
     }
@@ -133,7 +141,7 @@ export class ClientManager {
             const client_uri = document.location.origin + document.location.pathname;
             const redirect_uri = client_uri;
 
-            if (!this.oidcClientId) {
+            if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
                 const { registration_endpoint } = await (new MetadataService(new OidcClientSettingsStore({
                     authority,
                     redirect_uri,
@@ -171,6 +179,7 @@ export class ClientManager {
 
                 this.oidcClientId = json.client_id;
                 this.oidcClientSecret = json.client_secret;
+                this.oidcClientIssuer = authority;
 
                 log.info(`Registered with OIDC issuer as ${this.oidcClientId}`);
             }
