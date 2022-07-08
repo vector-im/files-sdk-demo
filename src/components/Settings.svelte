@@ -54,7 +54,7 @@ limitations under the License.
             return map;
         }, {} as Record<string, DeviceTrustLevel>);
 
-        manageAccountLink = (await getWellKnown(client().baseUrl))['m.authentication']?.account;        
+        manageAccountLink = (await getWellKnown(client().baseUrl))['org.matrix.msc2965.authentication']?.account;        
     }
     onMount(update);
 </script>

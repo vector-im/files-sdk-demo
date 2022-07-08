@@ -62,7 +62,7 @@ limitations under the License.
                     if (wellKnown['m.homeserver']?.base_url && wellKnown['m.homeserver'].base_url !== clientManager.homeserverUrl) {
                         clientManager.homeserverUrl = wellKnown['m.homeserver'].base_url;
                     }
-                    clientManager.oidcIssuer = wellKnown['m.authentication']?.issuer ?? '';
+                    clientManager.oidcIssuer = wellKnown['org.matrix.msc2965.authentication']?.issuer ?? '';
                     oidcSupported = !!clientManager.oidcIssuer;
                 } catch (e: any) {
                     // OIDC is not supported as no .well-known

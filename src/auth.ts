@@ -24,7 +24,7 @@ import { LocalStorageCryptoStore } from 'matrix-js-sdk/lib/crypto/store/localSto
 import { WebStorageSessionStore } from 'matrix-js-sdk/lib/store/session/webstorage';
 import { MatrixFiles } from 'matrix-files-sdk';
 
-export async function getWellKnown(baseUrl: string): Promise<{ 'm.authentication'? :{ issuer: string, account?: string }, 'm.homeserver'?: { base_url?: string } }> {
+export async function getWellKnown(baseUrl: string): Promise<{ 'org.matrix.msc2965.authentication'? :{ issuer: string, account?: string }, 'm.homeserver'?: { base_url?: string } }> {
     const url = new URL(baseUrl);
     url.search = '';
     url.pathname = '/.well-known/matrix/client';
