@@ -167,10 +167,10 @@ export class ClientManager {
 
                 const res = await fetch(registration_endpoint, {
                     method: 'POST',
+                    mode: 'no-cors',
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    credentials: "omit",
                     cache: 'no-cache',
                     body: JSON.stringify(clientMetadata),
                 });
