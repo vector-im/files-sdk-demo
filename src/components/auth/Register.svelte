@@ -132,16 +132,12 @@ limitations under the License.
                     Homeserver { clientManager.homeserverUrl } supports auth via OIDC:
                 </p>
                 <Button variant="unelevated" disabled={loading} on:click={() => registerWithOidc()}>
-                    Next
+                    Continue
                     {#if loading}
                         <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
                     {/if}                  
                 </Button>
-            {/if}
-            {#if oidcSupported && passwordSupported}
-                <p>or:</p>
-            {/if}
-            {#if passwordSupported}
+            {:else if passwordSupported}
                 <p>
                     Homeserver { clientManager.homeserverUrl } supports auth via Matrix password:
                 </p>
