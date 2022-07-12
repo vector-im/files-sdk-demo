@@ -31,6 +31,22 @@ const log = getLogger('ClientManager');
 
 const defaultHomeserver = process.env.DEFAULT_HOMESERVER!;
 
+type IssuerUri = string;
+interface ClientConfig {
+    client_id: string;
+    client_secret?: string;
+}
+
+// These are statically configured OIDC client IDs for particular issuers:
+const clientIds: Record<IssuerUri, ClientConfig> = {
+    "https://dev-6525741.okta.com/": {
+        client_id: "0oa5qpnjvfLILbe3W5d7",
+    },
+    "http://localhost:8091/auth/realms/master/": {
+        client_id: "file-sdk-demo"
+    },
+};
+
 export class ClientManager {
     private _files: MatrixFiles | undefined;
     private _crypto: MatrixCrypto | undefined;
@@ -69,8 +85,8 @@ export class ClientManager {
         storeValue("oidcClientId", val);
     }
 
-    public get oidcClientSecret(): string {
-        return readValue("oidcClientSecret", '');
+    public get oidcClientSecret(): string | undefined {
+        return readValue("oidcClientSecret", undefined);
     }
 
     public set oidcClientSecret(val) {
@@ -137,11 +153,17 @@ export class ClientManager {
         }
 
         if (!this.userManager) {
-            const authority = this.oidcIssuer;
+            const authority = `${this.oidcIssuer}${this.oidcIssuer.endsWith('/') ? '' : '/'}`;
             const client_uri = document.location.origin + document.location.pathname;
             const redirect_uri = client_uri;
 
-            if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
+            // use cached or pre-configured if available
+            if (clientIds[authority]) {
+                this.oidcClientId = clientIds[authority].client_id;
+                this.oidcClientSecret = clientIds[authority].client_secret;
+                this.oidcClientIssuer = authority;
+                log.info(`Using existing OIDC client_id ${this.oidcClientId} with issuer ${authority}`);
+            } else if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
                 const { registration_endpoint } = await (new MetadataService(new OidcClientSettingsStore({
                     authority,
                     redirect_uri,
@@ -180,6 +202,10 @@ export class ClientManager {
                 this.oidcClientId = json.client_id;
                 this.oidcClientSecret = json.client_secret;
                 this.oidcClientIssuer = authority;
+
+                // Cache the client details for subsequent use
+                clientIds[authority].client_id = this.oidcClientId;
+                clientIds[authority].client_secret = this.oidcClientSecret;
 
                 log.info(`Registered with OIDC issuer as ${this.oidcClientId}`);
             }
