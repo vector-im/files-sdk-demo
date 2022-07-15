@@ -24,7 +24,7 @@ import { toasts } from "svelte-toasts";
 import router from 'page';
 import { getLogger } from "log4js";
 import {
-    UserManager, MetadataService, OidcClientSettingsStore, type ExtraSigninRequestArgs,
+    UserManager, MetadataService, OidcClientSettingsStore, type ExtraSigninRequestArgs, type OidcMetadata,
 } from 'oidc-client-ts';
 
 const log = getLogger('ClientManager');
@@ -50,6 +50,7 @@ const clientIds: Record<IssuerUri, ClientConfig> = {
 export class ClientManager {
     private _files: MatrixFiles | undefined;
     private _crypto: MatrixCrypto | undefined;
+    private oidcIssuerMetadata?: Partial<OidcMetadata>;
 
     public readonly authedState = new SimpleObservable<boolean>(false);
 
@@ -145,6 +146,82 @@ export class ClientManager {
 
     private userManager: UserManager | undefined;
 
+    private async getIssuerMetadata() {
+        if (!this.oidcIssuerMetadata) {
+            this.oidcIssuerMetadata = await (new MetadataService(new OidcClientSettingsStore({
+            authority: this.oidcIssuer,
+            redirect_uri: 'notused',
+            client_id: 'notused',
+            }))).getMetadata();
+        }
+        return this.oidcIssuerMetadata;
+    }
+
+    public async assertOidcClientId() {
+        const authority = this.authority;
+
+        // use cached or pre-configured if available
+        if (clientIds[authority]) {
+            this.oidcClientId = clientIds[authority].client_id;
+            this.oidcClientSecret = clientIds[authority].client_secret;
+            this.oidcClientIssuer = authority;
+            log.info(`Using existing OIDC client_id ${this.oidcClientId} with issuer ${authority}`);
+        } else if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
+            const { registration_endpoint } = await this.getIssuerMetadata();
+
+            if (!registration_endpoint) {
+                throw new Error('The homeserver does not support this Matrix client');
+            }
+
+            const clientMetadata = {
+                client_name: "Files SDK Demo",
+                logo_uri: new URL("logo.svg", this.client_uri).href,
+                client_uri: this.client_uri,
+                tos_uri: "https://element.io/terms-of-service",
+                policy_uri: "https://element.io/privacy",
+                response_types: ["code"],
+                grant_types: ["authorization_code", "refresh_token"],
+                redirect_uris: [this.redirect_uri],
+                id_token_signed_response_alg: "RS256",
+                token_endpoint_auth_method: "none",
+            };
+
+            const res = await fetch(registration_endpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                credentials: "omit",
+                cache: 'no-cache',
+                body: JSON.stringify(clientMetadata),
+            });
+
+            const json = await res.json();
+
+            this.oidcClientId = json.client_id;
+            this.oidcClientSecret = json.client_secret;
+            this.oidcClientIssuer = authority;
+
+            // Cache the client details for subsequent use
+            clientIds[authority].client_id = this.oidcClientId;
+            clientIds[authority].client_secret = this.oidcClientSecret;
+
+            log.info(`Registered with OIDC issuer as ${this.oidcClientId}`);
+        }
+    }
+
+    private get authority(): string {
+        return `${this.oidcIssuer}${this.oidcIssuer.endsWith('/') ? '' : '/'}`;
+    }
+
+    private get client_uri(): string {
+        return document.location.origin + document.location.pathname;
+    }
+
+    private get redirect_uri(): string {
+        return this.client_uri;
+    }
+
     private async getOidcUserManager() {
         if (this.userManager && this.userManager.settings.authority !== this.oidcIssuer) {
             log.info('Recreating OIDC UserManager as issuer changed');
@@ -153,68 +230,13 @@ export class ClientManager {
         }
 
         if (!this.userManager) {
-            const authority = `${this.oidcIssuer}${this.oidcIssuer.endsWith('/') ? '' : '/'}`;
-            const client_uri = document.location.origin + document.location.pathname;
-            const redirect_uri = client_uri;
-
-            // use cached or pre-configured if available
-            if (clientIds[authority]) {
-                this.oidcClientId = clientIds[authority].client_id;
-                this.oidcClientSecret = clientIds[authority].client_secret;
-                this.oidcClientIssuer = authority;
-                log.info(`Using existing OIDC client_id ${this.oidcClientId} with issuer ${authority}`);
-            } else if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
-                const { registration_endpoint } = await (new MetadataService(new OidcClientSettingsStore({
-                    authority,
-                    redirect_uri,
-                    client_id: 'notused',
-                }))).getMetadata();
-
-                if (!registration_endpoint) {
-                    throw new Error('Server does not support client registration');
-                }
-
-                const clientMetadata = {
-                    client_name: "Files SDK Demo",
-                    logo_uri: new URL("logo.svg", client_uri).href,
-                    client_uri,
-                    tos_uri: "https://element.io/terms-of-service",
-                    policy_uri: "https://element.io/privacy",
-                    response_types: ["code"],
-                    grant_types: ["authorization_code", "refresh_token"],
-                    redirect_uris: [redirect_uri],
-                    id_token_signed_response_alg: "RS256",
-                    token_endpoint_auth_method: "none",
-                };
-
-                const res = await fetch(registration_endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: "omit",
-                    cache: 'no-cache',
-                    body: JSON.stringify(clientMetadata),
-                });
-
-                const json = await res.json();
-
-                this.oidcClientId = json.client_id;
-                this.oidcClientSecret = json.client_secret;
-                this.oidcClientIssuer = authority;
-
-                // Cache the client details for subsequent use
-                clientIds[authority].client_id = this.oidcClientId;
-                clientIds[authority].client_secret = this.oidcClientSecret;
-
-                log.info(`Registered with OIDC issuer as ${this.oidcClientId}`);
-            }
+            await this.assertOidcClientId();
 
             this.userManager = new UserManager({
-                authority,
+                authority: this.authority,
                 client_id: this.oidcClientId,
                 client_secret: this.oidcClientSecret,
-                redirect_uri,
+                redirect_uri: this.redirect_uri,
                 accessTokenExpiringNotificationTimeInSeconds: 30,
             });
             this.userManager.events.addUserLoaded(({ access_token, expires_in }) => {
