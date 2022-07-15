@@ -167,11 +167,14 @@ export class ClientManager {
             this.oidcClientIssuer = authority;
             log.info(`Using existing OIDC client_id ${this.oidcClientId} with issuer ${authority}`);
         } else if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
-            const { registration_endpoint } = await this.getIssuerMetadata();
+            const { registration_endpoint, grant_types_supported } = await this.getIssuerMetadata();
 
-            if (!registration_endpoint) {
+            if (!registration_endpoint || !grant_types_supported?.includes('authorization_code')) {
                 throw new Error('The homeserver does not support this Matrix client');
             }
+
+            // only ask for grants that are supported by the client
+            const grant_types = ["authorization_code", "refresh_token"].filter(x => grant_types_supported?.includes(x));
 
             const clientMetadata = {
                 client_name: "Files SDK Demo",
@@ -180,7 +183,7 @@ export class ClientManager {
                 tos_uri: "https://element.io/terms-of-service",
                 policy_uri: "https://element.io/privacy",
                 response_types: ["code"],
-                grant_types: ["authorization_code", "refresh_token"],
+                grant_types,
                 redirect_uris: [this.redirect_uri],
                 id_token_signed_response_alg: "RS256",
                 token_endpoint_auth_method: "none",
@@ -208,6 +211,15 @@ export class ClientManager {
 
             log.info(`Registered with OIDC issuer as ${this.oidcClientId}`);
         }
+
+        if (!await this.hasUsableGrant()) {
+            throw new Error('The homeserver can\'t support this Matrix client');
+        }
+    }
+
+    public async hasUsableGrant(): Promise<boolean> {
+        const metadata = await this.getIssuerMetadata();
+        return !!metadata.grant_types_supported?.includes('authorization_code');
     }
 
     private get authority(): string {
