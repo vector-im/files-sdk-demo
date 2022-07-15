@@ -68,7 +68,20 @@ limitations under the License.
                     // OIDC is not supported as no .well-known
                     log.warn(e);
                 }
+
                 passwordSupported = (await getLoginFlows(clientManager.homeserverUrl)).flows.some(x => x.type === 'm.login.password');
+
+                if (oidcSupported) {
+                    try {
+                        await clientManager.assertOidcClientId();
+                    } catch (e) {
+                        log.warn(e);
+                        oidcSupported = false;
+                        if (!passwordSupported) {
+                            throw e
+                        }
+                    }
+                }
             } catch (e: any) {
                 errorMessage = e?.message ?? 'An error occured';
             }
