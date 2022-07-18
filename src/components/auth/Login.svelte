@@ -117,7 +117,7 @@ limitations under the License.
             oidcDeviceFlow = await clientManager.startLoginWithOidcDeviceFlow();
             const res = await clientManager.waitForLoginWithOidcDeviceFlow();
             if (res.error) {
-                errorMessage = res.error_description ?? res.error;
+                errorMessage = res.error_description as string ?? res.error as string;
             }
             oidcDeviceFlow = undefined;
         } else {
