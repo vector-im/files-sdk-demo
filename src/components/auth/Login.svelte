@@ -30,7 +30,9 @@ limitations under the License.
     import { onDestroy, onMount } from 'svelte';
     import { getLogger } from 'log4js';
     import Card from "@smui/card";
+    import QrCode from "svelte-qrcode";
     import { debounce } from '../../utils';
+    import type { DeviceAuthorizationResponse } from 'oidc-client-ts';
 
     export let clientManager: ClientManager;
 
@@ -41,6 +43,9 @@ limitations under the License.
 
     let passwordSupported = false;
     let oidcSupported = false;
+    let deviceFlowSupported = false;
+
+    let oidcDeviceFlow: DeviceAuthorizationResponse | undefined;
 
     let homeserverInput = clientManager.homeserverUrl;
     
@@ -56,6 +61,7 @@ limitations under the License.
                 errorMessage = '';
                 passwordSupported = false;
                 oidcSupported = false;
+                deviceFlowSupported = false;
                 clientManager.oidcIssuer = '';
                 try {
                     const wellKnown = await getWellKnown(clientManager.homeserverUrl);
@@ -74,11 +80,12 @@ limitations under the License.
                 if (oidcSupported) {
                     try {
                         await clientManager.assertOidcClientId();
-                    } catch (e) {
+                        deviceFlowSupported = await clientManager.supportsDeviceCode();
+                    } catch (e: any) {
                         log.warn(e);
                         oidcSupported = false;
                         if (!passwordSupported) {
-                            throw e
+                            throw new Error(`Homeserver is not compatible with this Matrix client: ${e?.message ?? 'An error occured'}`);
                         }
                     }
                 }
@@ -104,9 +111,18 @@ limitations under the License.
         }
     }
 
-    async function loginWithOidc() {
+    async function loginWithOidc(deviceFlow: boolean) {
         log.info('loginWithOidc()');
-        await clientManager.loginWithOidc();
+        if (deviceFlow) {
+            oidcDeviceFlow = await clientManager.startLoginWithOidcDeviceFlow();
+            const res = await clientManager.waitForLoginWithOidcDeviceFlow();
+            if (res.error) {
+                errorMessage = res.error_description ?? res.error;
+            }
+            oidcDeviceFlow = undefined;
+        } else {
+            await clientManager.loginWithOidcNormalFlow();
+        }
     }
     
     const debouncedHomeserver = debounce(() => clientManager.homeserverUrl = homeserverInput, 250);
@@ -142,12 +158,46 @@ limitations under the License.
                     {errorMessage}
                 </p>
             {/if}
-            {#if oidcSupported}
+            {#if oidcDeviceFlow}
+                <div style="text-align: center">
+                    {#if oidcDeviceFlow.verification_uri_complete}
+                        <p>Scan this code on your other device to continue sign in</p>
+                        <div>
+                            <QrCode value={oidcDeviceFlow.verification_uri_complete} />                        
+                        </div>
+                    {/if}
+                    <p>{oidcDeviceFlow.verification_uri_complete ? 'or go' : 'Go'} to:</p>
+                    <p><strong>{oidcDeviceFlow.verification_uri}</strong></p>
+                    <p>and enter code:</p>
+                    <p><strong>{oidcDeviceFlow.user_code}</strong></p>
+
+                    <p>Changed your mind?</p>
+                    <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc(false)}>
+                        Continue on this device
+                        {#if loading}
+                            <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                        {/if}                  
+                    </Button>
+    
+                </div>
+            {:else if oidcSupported}
                 <p>
                     Homeserver { clientManager.homeserverUrl } supports auth via OIDC:
                 </p>
-                <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc()}>
-                    Continue
+                {#if deviceFlowSupported }
+                    <p>
+                        Already signed in on another device? You can use it to complete sign in
+                    </p>
+                    <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc(true)}>
+                        Use another device
+                        {#if loading}
+                            <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
+                        {/if}                  
+                    </Button>
+                    <p style="text-align: center">or:</p>
+                {/if}
+                <Button variant="unelevated" disabled={loading} on:click={() => loginWithOidc(false)}>
+                    {deviceFlowSupported ? 'Continue on this device' : 'Continue'}
                     {#if loading}
                         <CircularProgress indeterminate style="height: 24px; width: 24px; margin-left: 8px;" />
                     {/if}                  

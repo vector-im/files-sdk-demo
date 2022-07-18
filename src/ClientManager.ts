@@ -24,7 +24,7 @@ import { toasts } from "svelte-toasts";
 import router from 'page';
 import { getLogger } from "log4js";
 import {
-    UserManager, MetadataService, OidcClientSettingsStore, type ExtraSigninRequestArgs, type OidcMetadata,
+    UserManager, MetadataService, OidcClientSettingsStore, type DeviceAuthorizationResponse, type OidcMetadata,
 } from 'oidc-client-ts';
 
 const log = getLogger('ClientManager');
@@ -51,6 +51,7 @@ export class ClientManager {
     private _files: MatrixFiles | undefined;
     private _crypto: MatrixCrypto | undefined;
     private oidcIssuerMetadata?: Partial<OidcMetadata>;
+    private deviceFlow?: DeviceAuthorizationResponse;
 
     public readonly authedState = new SimpleObservable<boolean>(false);
 
@@ -169,12 +170,16 @@ export class ClientManager {
         } else if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
             const { registration_endpoint, grant_types_supported } = await this.getIssuerMetadata();
 
-            if (!registration_endpoint || !grant_types_supported?.includes('authorization_code')) {
-                throw new Error('The homeserver does not support this Matrix client');
+            if (!registration_endpoint) {
+                throw new Error('Unable to register with issuer');
             }
 
             // only ask for grants that are supported by the client
-            const grant_types = ["authorization_code", "refresh_token"].filter(x => grant_types_supported?.includes(x));
+            const grant_types = ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"].filter(x => grant_types_supported?.includes(x));
+
+            if (grant_types.length <= 1 && grant_types.includes("refresh_token")) {
+                throw new Error('No supported authentication flow available');
+            }
 
             const clientMetadata = {
                 client_name: "Files SDK Demo",
@@ -213,13 +218,20 @@ export class ClientManager {
         }
 
         if (!await this.hasUsableGrant()) {
-            throw new Error('The homeserver can\'t support this Matrix client');
+            throw new Error('No supported authentication flow available');
         }
     }
 
+    private static supportedGrants = ['authorization_code', 'urn:ietf:params:oauth:grant-type:device_code'];
+
     public async hasUsableGrant(): Promise<boolean> {
         const metadata = await this.getIssuerMetadata();
-        return !!metadata.grant_types_supported?.includes('authorization_code');
+        return !!metadata.grant_types_supported?.some(x => ClientManager.supportedGrants.includes(x));
+    }
+
+    public async supportsDeviceCode(): Promise<boolean> {
+        const { grant_types_supported, device_authorization_endpoint } = await this.getIssuerMetadata();
+        return !!(grant_types_supported?.includes('urn:ietf:params:oauth:grant-type:device_code') && device_authorization_endpoint);
     }
 
     private get authority(): string {
@@ -295,14 +307,35 @@ export class ClientManager {
         });
     }
 
-    public async loginWithOidc() {
-        log.info('loginWithOidc()');
-        await (await this.getOidcUserManager()).signinRedirect({ prompt: 'login' } as any as ExtraSigninRequestArgs);
+    public async loginWithOidcNormalFlow() {
+        log.info('loginWithOidcNormalFlow()');
+        const userManager = await this.getOidcUserManager();
+        await userManager.signinRedirect({ prompt: 'login' });
+    }
+
+    public async startLoginWithOidcDeviceFlow(): Promise<DeviceAuthorizationResponse> {
+        log.info('startLoginWithOidcDeviceFlow()');
+        const userManager = await this.getOidcUserManager();
+        this.deviceFlow = await userManager.startDeviceAuthorization('openid');
+        return this.deviceFlow;
+    }
+
+    public async waitForLoginWithOidcDeviceFlow() {
+        log.info('waitForLoginWithOidcDeviceFlow()');
+        if (!this.deviceFlow) {
+            throw new Error('Device flow not started');
+        }
+        const userManager = await this.getOidcUserManager();
+        const res = await userManager.waitForDeviceAuthorization(this.deviceFlow);
+        this.deviceFlow = undefined;
+        await this.rehydrate();
+        router.redirect('/');
+        return res;
     }
 
     public async registerWithOidc() {
         log.info('registerWithOidc()');
-        await (await this.getOidcUserManager()).signinRedirect({ prompt: 'create' } as any as ExtraSigninRequestArgs);
+        await (await this.getOidcUserManager()).signinRedirect({ prompt: 'create' });
     }
 
     public async completeOidcLogin() {
@@ -335,7 +368,6 @@ export class ClientManager {
                 await this.rehydrate();
 
                 router.replace('/');
-
             }
         }
     }
