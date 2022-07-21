@@ -24,6 +24,7 @@
     "@types/crypto-js": "^4.1.1",
     "@types/mime-types": "^2.1.1",
     "@types/page": "^1.11.5",
+    "@types/uuid": "^8.3.4",
     "clean-webpack-plugin": "^4.0.0",
     "copy-webpack-plugin": "^9.0.1",
     "css-loader": "^6.5.1",
@@ -80,6 +81,7 @@
     "svelte-material-ui": "^5.0.1",
     "svelte-preprocess": "^4.10.1",
     "svelte-qrcode": "^1.0.0",
-    "svelte-toasts": "^1.1.2"
+    "svelte-toasts": "^1.1.2",
+    "uuid": "^8.3.2"
   }
 }

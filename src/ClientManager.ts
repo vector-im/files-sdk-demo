@@ -26,6 +26,7 @@ import { getLogger } from "log4js";
 import {
     UserManager, MetadataService, OidcClientSettingsStore, type DeviceAuthorizationResponse, type OidcMetadata,
 } from 'oidc-client-ts';
+import { v4 } from 'uuid';
 
 const log = getLogger('ClientManager');
 
@@ -42,7 +43,7 @@ const clientIds: Record<IssuerUri, ClientConfig> = {
     "https://dev-6525741.okta.com/": {
         client_id: "0oa5qpnjvfLILbe3W5d7",
     },
-    "http://localhost:8091/auth/realms/master/": {
+    "http://localhost:8091/realms/master/": {
         client_id: "file-sdk-demo"
     },
 };
@@ -256,12 +257,17 @@ export class ClientManager {
         if (!this.userManager) {
             await this.assertOidcClientId();
 
+            if (!this.deviceId) {
+                this.deviceId = v4();
+            }
+
             this.userManager = new UserManager({
                 authority: this.authority,
                 client_id: this.oidcClientId,
                 client_secret: this.oidcClientSecret,
                 redirect_uri: this.redirect_uri,
                 accessTokenExpiringNotificationTimeInSeconds: 30,
+                scope: `openid profile offline_access urn:matrix:api:* urn:matrix:device:${this.deviceId}`,
             });
             this.userManager.events.addUserLoaded(({ access_token, expires_in }) => {
                 log.debug(`Access token renewed with new expiry in ${expires_in}s`);
@@ -284,7 +290,7 @@ export class ClientManager {
         try {
             await f();
         } catch (e: any) {
-            console.error(e.errcode);
+            log.error(e);
             if (e instanceof MatrixError && e.errcode === 'M_FORBIDDEN') {
                 toasts.warning('You have been signed out', { duration: 5000 });
                 await this._logout(this.homeserverUrl);
@@ -316,7 +322,7 @@ export class ClientManager {
     public async startLoginWithOidcDeviceFlow(): Promise<DeviceAuthorizationResponse> {
         log.info('startLoginWithOidcDeviceFlow()');
         const userManager = await this.getOidcUserManager();
-        this.deviceFlow = await userManager.startDeviceAuthorization('openid');
+        this.deviceFlow = await userManager.startDeviceAuthorization();
         return this.deviceFlow;
     }
 
@@ -328,7 +334,11 @@ export class ClientManager {
         const userManager = await this.getOidcUserManager();
         const res = await userManager.waitForDeviceAuthorization(this.deviceFlow);
         this.deviceFlow = undefined;
-        await this.rehydrate();
+        const { access_token } = res;
+        if (access_token) {
+            await this.whoami(access_token as string);
+            await this.rehydrate();
+        }
         router.redirect('/');
         return res;
     }
@@ -338,8 +348,24 @@ export class ClientManager {
         await (await this.getOidcUserManager()).signinRedirect({ prompt: 'create' });
     }
 
+    private async whoami(access_token: string) {
+        const url = new URL(this.homeserverUrl);
+        url.search = '';
+        url.pathname = '/_matrix/client/v3/account/whoami';
+
+        const response = await fetch(url.href, { headers: { Authorization: `Bearer ${access_token}` } });
+
+        const { device_id, user_id } = await response.json();
+
+        log.info(`whoami() => device_id=${device_id} user_id=${user_id}`);
+        this.accessToken = access_token;
+        this.deviceId = device_id;
+        this.userId = user_id;
+        this.password = '';
+    }
+
     public async completeOidcLogin() {
-        log.info('completeLoginWithAccessToken()');
+        log.info('completeOidcLogin()');
 
         const authority = this.oidcIssuer;
         if (!authority) {
@@ -348,19 +374,8 @@ export class ClientManager {
             const signinResponse = await (await this.getOidcUserManager()).signinCallback();
             if (signinResponse) {
                 const { access_token } = signinResponse;
-
-                const url = new URL(this.homeserverUrl);
-                url.search = '';
-                url.pathname = '/_matrix/client/v3/account/whoami';
-
-                const response = await fetch(url.href, { headers: { Authorization: `Bearer ${access_token}` } });
-
-                const { device_id, user_id } = await response.json();
-
-                this.accessToken = access_token;
-                this.deviceId = device_id;
-                this.userId = user_id;
-                this.password = '';
+                
+                await this.whoami(access_token);
 
                 // remove query params from current URL:
                 window.history.pushState('object', document.title, location.href.split("?")[0]);

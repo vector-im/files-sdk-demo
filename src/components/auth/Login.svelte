@@ -54,6 +54,12 @@ limitations under the License.
     $: params = new URLSearchParams(document.location.search);
 
     $: (async () => {
+        if (params.has('error_description')) {
+            errorMessage = params.get('error_description') ?? params.get('error') ?? '';
+            window.history.pushState('object', document.title, location.href.split("?")[0]);
+            params = new URLSearchParams(document.location.search);
+            loadedServerInfo = clientManager.homeserverUrl;
+        }
         if (params.has('code')) {
             // OIDC in progress?
         } else if (loadedServerInfo !== clientManager.homeserverUrl) {
@@ -113,11 +119,13 @@ limitations under the License.
 
     async function loginWithOidc(deviceFlow: boolean) {
         log.info('loginWithOidc()');
+        errorMessage = '';
         if (deviceFlow) {
-            oidcDeviceFlow = await clientManager.startLoginWithOidcDeviceFlow();
-            const res = await clientManager.waitForLoginWithOidcDeviceFlow();
-            if (res.error) {
-                errorMessage = res.error_description as string ?? res.error as string;
+            try {
+                oidcDeviceFlow = await clientManager.startLoginWithOidcDeviceFlow();
+                await clientManager.waitForLoginWithOidcDeviceFlow();
+            } catch (e: any) {
+                errorMessage = e.error_description ?? e.error ?? e.message ?? 'An error occurred';
             }
             oidcDeviceFlow = undefined;
         } else {
