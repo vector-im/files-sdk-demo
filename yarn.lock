@@ -4224,7 +4224,7 @@ object.assign@^4.1.2:
     has-symbols "^1.0.1"
     object-keys "^1.1.1"
 
-oidc-client-ts@hughns/oidc-client-ts#hughns/device-flow:
+oidc-client-ts@hughns/oidc-client-ts#08ac93b33fd1b021b6771c80397bbc6754fa3b8c:
   version "2.0.5"
   resolved "https://codeload.github.com/hughns/oidc-client-ts/tar.gz/08ac93b33fd1b021b6771c80397bbc6754fa3b8c"
   dependencies:

@@ -72,7 +72,7 @@
     "matrix-files-sdk": "^2.4.1",
     "matrix-js-sdk": "^15.6.0-rc.1",
     "mime-types": "^2.1.34",
-    "oidc-client-ts": "hughns/oidc-client-ts#hughns/device-flow",
+    "oidc-client-ts": "hughns/oidc-client-ts#08ac93b33fd1b021b6771c80397bbc6754fa3b8c",
     "page": "^1.11.6",
     "svelte": "^3.46.2",
     "svelte-accordion": "^0.0.0-development",
