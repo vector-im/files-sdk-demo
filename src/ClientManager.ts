@@ -148,6 +148,8 @@ export class ClientManager {
 
     private userManager: UserManager | undefined;
 
+    private grant_types_supported: string[] = [];
+
     private async getIssuerMetadata() {
         if (!this.oidcIssuerMetadata) {
             this.oidcIssuerMetadata = await (new MetadataService(new OidcClientSettingsStore({
@@ -155,6 +157,21 @@ export class ClientManager {
             redirect_uri: 'notused',
             client_id: 'notused',
             }))).getMetadata();
+            const {
+                grant_types_supported, device_authorization_endpoint, authorization_endpoint,
+            } = this.oidcIssuerMetadata;
+            if (grant_types_supported) {
+                this.grant_types_supported = grant_types_supported;
+            } else {
+                this.grant_types_supported = [];
+                if (authorization_endpoint) {
+                    this.grant_types_supported.push("authorization_code");
+                    this.grant_types_supported.push("refresh_token");
+                }
+                if (device_authorization_endpoint) {
+                    this.grant_types_supported.push("urn:ietf:params:oauth:grant-type:device_code");
+                }
+            }
         }
         return this.oidcIssuerMetadata;
     }
@@ -169,16 +186,16 @@ export class ClientManager {
             this.oidcClientIssuer = authority;
             log.info(`Using existing OIDC client_id ${this.oidcClientId} with issuer ${authority}`);
         } else if (!this.oidcClientId || this.oidcClientIssuer !== authority) {
-            const { registration_endpoint, grant_types_supported } = await this.getIssuerMetadata();
+            const { registration_endpoint } = await this.getIssuerMetadata();
 
             if (!registration_endpoint) {
                 throw new Error('Unable to register with issuer');
             }
 
-            // only ask for grants that are supported by the client
-            const grant_types = ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"].filter(x => grant_types_supported?.includes(x));
+            // only ask for grants that are supported by the client and server
+            const grant_types = ["authorization_code", "refresh_token", "urn:ietf:params:oauth:grant-type:device_code"].filter(x => this.grant_types_supported.includes(x));
 
-            if (grant_types.length <= 1 && grant_types.includes("refresh_token")) {
+            if (grant_types.length === 0 || (grant_types.length === 1 && grant_types.includes("refresh_token"))) {
                 throw new Error('No supported authentication flow available');
             }
 
@@ -226,13 +243,13 @@ export class ClientManager {
     private static supportedGrants = ['authorization_code', 'urn:ietf:params:oauth:grant-type:device_code'];
 
     public async hasUsableGrant(): Promise<boolean> {
-        const metadata = await this.getIssuerMetadata();
-        return !!metadata.grant_types_supported?.some(x => ClientManager.supportedGrants.includes(x));
+        await this.getIssuerMetadata();
+        return !!this.grant_types_supported.some(x => ClientManager.supportedGrants.includes(x));
     }
 
     public async supportsDeviceCode(): Promise<boolean> {
-        const { grant_types_supported, device_authorization_endpoint } = await this.getIssuerMetadata();
-        return !!(grant_types_supported?.includes('urn:ietf:params:oauth:grant-type:device_code') && device_authorization_endpoint);
+        const { device_authorization_endpoint } = await this.getIssuerMetadata();
+        return !!(this.grant_types_supported.includes('urn:ietf:params:oauth:grant-type:device_code') && device_authorization_endpoint);
     }
 
     private get authority(): string {
