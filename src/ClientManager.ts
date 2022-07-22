@@ -224,15 +224,18 @@ export class ClientManager {
 
             const json = await res.json();
 
-            this.oidcClientId = json.client_id;
-            this.oidcClientSecret = json.client_secret;
-            this.oidcClientIssuer = authority;
-
             // Cache the client details for subsequent use
-            clientIds[authority].client_id = this.oidcClientId;
-            clientIds[authority].client_secret = this.oidcClientSecret;
+            clientIds[authority].client_id = json.client_id;
+            clientIds[authority].client_secret = json.client_secret;
 
-            log.info(`Registered with OIDC issuer as ${this.oidcClientId}`);
+            log.info(`Registered with OIDC issuer as ${json.client_id}`);
+
+            // handle case of authority changing since we started registration:
+            if (authority === this.authority) {
+                this.oidcClientId = json.client_id;
+                this.oidcClientSecret = json.client_secret;
+                this.oidcClientIssuer = authority;
+            }
         }
 
         if (!await this.hasUsableGrant()) {
