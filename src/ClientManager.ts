@@ -151,7 +151,7 @@ export class ClientManager {
     private grant_types_supported: string[] = [];
 
     private async getIssuerMetadata() {
-        if (!this.oidcIssuerMetadata) {
+        if (!this.oidcIssuerMetadata || this.oidcIssuer !== this.oidcIssuerMetadata.issuer) {
             this.oidcIssuerMetadata = await (new MetadataService(new OidcClientSettingsStore({
             authority: this.oidcIssuer,
             redirect_uri: 'notused',
@@ -199,6 +199,8 @@ export class ClientManager {
                 throw new Error('No supported authentication flow available');
             }
 
+            log.info(`Attempting registration with OIDC issuer at ${registration_endpoint}`);
+
             const clientMetadata = {
                 client_name: "Files SDK Demo",
                 logo_uri: new URL("logo.svg", this.client_uri).href,
@@ -226,8 +228,10 @@ export class ClientManager {
                 const json = await res.json();
 
                 // Cache the client details for subsequent use
-                clientIds[authority].client_id = json.client_id;
-                clientIds[authority].client_secret = json.client_secret;
+                clientIds[authority] = {
+                    client_id: json.client_id,
+                    client_secret: json.client_secret,
+                };
 
                 log.info(`Registered with OIDC issuer as ${json.client_id}`);
 
@@ -239,7 +243,7 @@ export class ClientManager {
                 }
             } catch (e: any) {
                 log.error(e);
-                throw new Error(`Unable to register with OIDC Provider - ${e?.message}`);
+                throw new Error(`Unable to register with OIDC Provider (${authority}) - ${e?.message}`);
             }
         }
 
