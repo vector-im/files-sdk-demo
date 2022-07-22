@@ -120,16 +120,17 @@ limitations under the License.
     async function loginWithOidc(deviceFlow: boolean) {
         log.info('loginWithOidc()');
         errorMessage = '';
-        if (deviceFlow) {
-            try {
+        try {
+            if (deviceFlow) {
                 oidcDeviceFlow = await clientManager.startLoginWithOidcDeviceFlow();
                 await clientManager.waitForLoginWithOidcDeviceFlow();
-            } catch (e: any) {
-                errorMessage = e.error_description ?? e.error ?? e.message ?? 'An error occurred';
+                oidcDeviceFlow = undefined;
+            } else {
+                await clientManager.loginWithOidcNormalFlow();
             }
-            oidcDeviceFlow = undefined;
-        } else {
-            await clientManager.loginWithOidcNormalFlow();
+        } catch (e: any) {
+            log.warn(e);
+            errorMessage = `Unable to sign in: ${e.error_description ?? e.error ?? e.message ?? 'An error occurred'}`;
         }
     }
     
