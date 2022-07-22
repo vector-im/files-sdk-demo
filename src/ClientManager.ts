@@ -212,29 +212,34 @@ export class ClientManager {
                 token_endpoint_auth_method: "none",
             };
 
-            const res = await fetch(registration_endpoint, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                credentials: "omit",
-                cache: 'no-cache',
-                body: JSON.stringify(clientMetadata),
-            });
+            try {
+                const res = await fetch(registration_endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: "omit",
+                    cache: 'no-cache',
+                    body: JSON.stringify(clientMetadata),
+                });
 
-            const json = await res.json();
+                const json = await res.json();
 
-            // Cache the client details for subsequent use
-            clientIds[authority].client_id = json.client_id;
-            clientIds[authority].client_secret = json.client_secret;
+                // Cache the client details for subsequent use
+                clientIds[authority].client_id = json.client_id;
+                clientIds[authority].client_secret = json.client_secret;
 
-            log.info(`Registered with OIDC issuer as ${json.client_id}`);
+                log.info(`Registered with OIDC issuer as ${json.client_id}`);
 
-            // handle case of authority changing since we started registration:
-            if (authority === this.authority) {
-                this.oidcClientId = json.client_id;
-                this.oidcClientSecret = json.client_secret;
-                this.oidcClientIssuer = authority;
+                // handle case of authority changing since we started registration:
+                if (authority === this.authority) {
+                    this.oidcClientId = json.client_id;
+                    this.oidcClientSecret = json.client_secret;
+                    this.oidcClientIssuer = authority;
+                }
+            } catch (e: any) {
+                log.error(e);
+                throw new Error(`Unable to register with OIDC Provider - ${e?.message}`);
             }
         }
 
