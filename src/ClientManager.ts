@@ -46,6 +46,9 @@ const clientIds: Record<IssuerUri, ClientConfig> = {
     "http://localhost:8091/realms/master/": {
         client_id: "file-sdk-demo"
     },
+    "https://keycloak-oidc.lab.element.dev/realms/master/": {
+        client_id: "file-sdk-demo"
+    },
 };
 
 export class ClientManager {
