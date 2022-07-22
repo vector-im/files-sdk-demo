@@ -44,10 +44,10 @@ const clientIds: Record<IssuerUri, ClientConfig> = {
         client_id: "0oa5qpnjvfLILbe3W5d7",
     },
     "http://localhost:8091/realms/master/": {
-        client_id: "file-sdk-demo"
+        client_id: "files-sdk-demo"
     },
     "https://keycloak-oidc.lab.element.dev/realms/master/": {
-        client_id: "file-sdk-demo"
+        client_id: "files-sdk-demo"
     },
 };
 
