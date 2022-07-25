@@ -337,7 +337,7 @@ export class ClientManager {
     public async rehydrate() {
         if (this.oidcIssuer) {
             // initialise UserManager for refreshing tokens
-            this.getOidcUserManager();
+            await this.getOidcUserManager();
         }
         await this.wrapForbidden(async () => {
             this._files = await createFromToken(localStorage, this.homeserverUrl, this.accessToken, this.userId, this.deviceId);
@@ -485,6 +485,11 @@ export class ClientManager {
             }
             this._files = undefined;
             this._crypto = undefined;
+        }
+        if (this.oidcIssuer) {
+            // revoke access and refresh toeksn
+            const oidcUserManager = await this.getOidcUserManager();
+            await oidcUserManager.revokeTokens(["access_token", "refresh_token"]);
         }
         localStorage.clear();
         sessionStorage.clear();
