@@ -299,7 +299,7 @@ export class ClientManager {
                 client_secret: this.oidcClientSecret,
                 redirect_uri: this.redirect_uri,
                 accessTokenExpiringNotificationTimeInSeconds: 30,
-                scope: `openid offline_access urn:matrix:api:* urn:matrix:device:${this.deviceId}`,
+                scope: `openid urn:matrix:api:* urn:matrix:device:${this.deviceId}`,
             });
             this.userManager.events.addUserLoaded(({ access_token, expires_in }) => {
                 log.debug(`Access token renewed with new expiry in ${expires_in}s`);
