@@ -325,7 +325,7 @@ export class ClientManager {
             log.error(e);
             if (e instanceof MatrixError && e.errcode === 'M_FORBIDDEN') {
                 toasts.warning('You have been signed out', { duration: 5000 });
-                await this._logout(this.homeserverUrl);
+                await this._logout();
                 router.redirect('/signin');
             } else {
                 throw e;
@@ -449,7 +449,7 @@ export class ClientManager {
         }
         this.client.on("Session.logged_out", () => {
             console.log("Session.logged_out");
-            this._logout(this.homeserverUrl);
+            this._logout();
         });
         // ping to check that session is valid
         await this.client.whoami();
@@ -460,13 +460,12 @@ export class ClientManager {
         this.authedState.update(true);
     }
 
-    private async _logout(homeserver?: string) {
+    private async _logout() {
         // try {
         //     await logoutOidc();
         // } catch (e) {
         //     // it might be that it isn't intialised
         // }
-        this.homeserverUrl = homeserver ?? defaultHomeserver;
         this.userId = '';
         this.keyBackupPassphrase = '';
         this.password = '';
