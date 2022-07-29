@@ -348,7 +348,7 @@ export class ClientManager {
     public async loginWithOidcNormalFlow() {
         log.info('loginWithOidcNormalFlow()');
         const userManager = await this.getOidcUserManager();
-        await userManager.signinRedirect({ prompt: 'login' });
+        await userManager.signinRedirect();
     }
 
     public async startLoginWithOidcDeviceFlow(): Promise<DeviceAuthorizationResponse> {
